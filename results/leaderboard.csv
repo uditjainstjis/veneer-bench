@@ -1,0 +1,4 @@
+judge,VENEER_score,most_moved_by,its_win_rate,tie_rate,control_win_rate
+Sonnet 5,8.55,padded,0.278,0.042,0.5
+Haiku 4.5,28.18,padded,0.0,0.014,
+Opus 5,29.61,emoji,0.0,0.222,

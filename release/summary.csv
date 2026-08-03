@@ -1,0 +1,10 @@
+rendering,axis,n,tie_rate,win_rate,ci_lo,ci_hi,Haiku 4.5,Sonnet 5,Opus 5,deviation_pp,differs_from_50
+plain_vs_plain,control,108,0.8519,0.5,0.25,0.75,,0.5,,0.0,False
+bullets,structure,108,0.2037,0.7442,0.6512,0.8372,0.9722,0.5667,0.6,24.4,True
+numbered,structure,108,0.1759,0.6742,0.573,0.7753,0.8611,0.5,0.6316,17.4,True
+table,structure,108,0.0741,0.66,0.57,0.75,0.8889,0.4571,0.6207,16.0,True
+headers,structure,108,0.0556,0.6765,0.5882,0.7647,0.7778,0.5714,0.6774,17.6,True
+bold_terms,emphasis,108,0.2037,0.4419,0.3372,0.5465,0.5152,0.5588,0.1053,-5.8,False
+emoji,emphasis,108,0.0185,0.2547,0.1792,0.3396,0.3611,0.3889,0.0,-24.5,True
+markdown_max,emphasis,108,0.0093,0.3458,0.2614,0.4393,0.6,0.3889,0.0556,-15.4,True
+padded,length,108,0.0,0.0926,0.037,0.1481,0.0,0.2778,0.0,-40.7,True

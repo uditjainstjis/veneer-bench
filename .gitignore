@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+data/gen.log
+results/judge.log
+.DS_Store

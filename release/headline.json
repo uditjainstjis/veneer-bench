@@ -1,0 +1,64 @@
+{
+ "n_judgments": 972,
+ "n_items": 36,
+ "judges": [
+  "Haiku 4.5",
+  "Opus 5",
+  "Sonnet 5"
+ ],
+ "noise_floor_win_rate": 0.5,
+ "noise_floor_ci_hi": 0.75,
+ "top_rendering": "bullets",
+ "top_win_rate": 0.7442,
+ "top_ci": [
+  0.6512,
+  0.8372
+ ],
+ "bottom_rendering": "padded",
+ "bottom_win_rate": 0.0926,
+ "swing_pp": 65.2,
+ "control_tie_rate": 0.8519,
+ "variant_tie_rate": 0.0926,
+ "n_significant": 7,
+ "control_tie_by_judge": {
+  "Haiku 4.5": 1.0,
+  "Opus 5": 1.0,
+  "Sonnet 5": 0.556
+ },
+ "position_bias": {
+  "Haiku 4.5": 0.641,
+  "Opus 5": 0.438,
+  "Sonnet 5": 0.182
+ },
+ "per_judge_top": {
+  "Opus 5": 0.6,
+  "Sonnet 5": 0.5667,
+  "Haiku 4.5": 0.9722
+ },
+ "leaderboard": [
+  {
+   "judge": "Sonnet 5",
+   "VENEER_score": 8.55,
+   "most_moved_by": "padded",
+   "its_win_rate": 0.278,
+   "tie_rate": 0.042,
+   "control_win_rate": 0.5
+  },
+  {
+   "judge": "Haiku 4.5",
+   "VENEER_score": 28.18,
+   "most_moved_by": "padded",
+   "its_win_rate": 0.0,
+   "tie_rate": 0.014,
+   "control_win_rate": NaN
+  },
+  {
+   "judge": "Opus 5",
+   "VENEER_score": 29.61,
+   "most_moved_by": "emoji",
+   "its_win_rate": 0.0,
+   "tie_rate": 0.222,
+   "control_win_rate": NaN
+  }
+ ]
+}
