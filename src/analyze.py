@@ -76,12 +76,24 @@ def main():
         per_r = sub.groupby("rendering").apply(win_rate).dropna()
         ctrl = df[(df.judge_s == j) & (df.rendering == CTRL)]
         dev = (per_r - .5).abs()
+        # A judge whose verdict is dominated by WHERE an answer sits produces a
+        # win rate pulled toward 0.5 for every condition, which is
+        # indistinguishable from genuine format-blindness unless position is
+        # reported alongside. So it always is.
+        nt = sub[sub.winner != "tie"]
+        first_pick = float((nt.raw == "A").mean())
+        second = (nt[nt.plain_first].winner == "variant").mean()
+        firstpos = (nt[~nt.plain_first].winner == "variant").mean()
+        gap = float(second - firstpos)
         lb.append({"judge": j,
                    "VENEER_score": round(float(dev.mean() * 100), 2),
                    # the format that moves this judge furthest from indifference,
                    # in EITHER direction -- not merely the one it likes most
                    "most_moved_by": dev.idxmax(),
                    "its_win_rate": round(float(per_r[dev.idxmax()]), 3),
+                   "first_pick_rate": round(first_pick, 3),
+                   "position_gap": round(gap, 3),
+                   "position_confounded": abs(gap) > .5,
                    "tie_rate": round(float((sub.winner == "tie").mean()), 3),
                    "control_win_rate": round(float(win_rate(ctrl)), 3)})
     lbdf = pd.DataFrame(lb).sort_values("VENEER_score")

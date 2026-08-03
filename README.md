@@ -22,14 +22,19 @@ The same claims win **74.4%** of the time dressed as `bullets` and only
 The direction is the interesting part, and it is not "more formatting is better":
 
 - **Structure helps.** Bullets, numbered lists, generic headings and tables
-  average **68.9%** against plain prose.
-- **Decoration hurts.** Bolded terms, emoji bullets and maximal markdown average
-  **34.7%**. Padding the answer with neutral filler — no new facts — is
-  punished hardest.
+  average **68.9%** against plain prose. All four clear indifference.
+- **Bulk is punished hardest.** `padded` — the same claims wrapped in neutral
+  hedging, not one new fact — wins just **9.3%**.
+- **Decoration is mixed, and that is the sharper finding.** Emoji and maximal
+  markdown lose overall, but `bold_terms` is the one condition whose confidence
+  interval still contains 50% — so "decoration hurts" is not a safe blanket
+  claim.
 
-So an LLM judge is not simply impressed by markdown. It rewards *navigability*
-and penalises *ornament and bulk*. Both are pure presentation, and both move the
-verdict by more than most real quality differences do.
+**The judges disagree in sign.** On `markdown_max`, Haiku 4.5 scores
+0.600 and Opus 5 scores
+0.056 — the *same answer* wins or loses depending
+on which judge you asked, on formatting alone. Pooling across judges hides this;
+the per-judge table below does not.
 
 **The control matters most.** Plain prose judged against a byte-identical copy of
 itself ties **85%** of the time — the judges correctly see no difference
@@ -47,16 +52,34 @@ conditions differ from indifference at 95% confidence.
 
 **VENEER score** = mean absolute deviation from a 50% win rate across all format
 conditions, in percentage points. It is how much of a verdict presentation alone
-can buy. **0 = perfectly format-blind.** Lower is better.
+can buy. **0 = perfectly format-blind.** Lower is better — but only for a
+judge that is not position-confounded (next paragraph).
 
-| judge | VENEER score ↓ | format that moves it most | its win rate |
-|---|---|---|---|
-| Sonnet 5 | **8.55** | `padded` | 27.8% |
-| Haiku 4.5 | **28.18** | `padded` | 0.0% |
-| Opus 5 | **29.61** | `emoji` | 0.0% |
+**A VENEER score is only interpretable next to the judge's position bias**, so
+the two are always reported together. A judge whose verdict is decided by *where*
+an answer sits produces a win rate pulled toward 50% in every condition — which
+looks identical to genuine format-blindness.
 
-Most format-robust judge here: **Sonnet 5** (8.55).
-Most susceptible: **Opus 5** (29.61).
+| judge | VENEER score ↓ | moved most by | its win rate | picks 1st-shown | position gap | confounded |
+|---|---|---|---|---|---|---|
+| Sonnet 5 | **8.55** | `padded` | 27.8% | 13% | +0.73 | **yes** |
+| Haiku 4.5 | **28.18** | `padded` | 0.0% | 64% | -0.28 | no |
+| Opus 5 | **29.61** | `emoji` | 0.0% | 44% | +0.17 | no |
+
+**Read that table carefully — the lowest score is not the best judge.**
+Sonnet 5 scores 8.55, but it picks the
+first-shown answer only 13% of the time: its
+variant wins **87%** of the time when the
+variant is shown second and collapses when shown first (gap
++0.73). Randomising order correctly cancels that in the
+pooled number, which is exactly why its VENEER score looks flat. **That is
+position dominance, not format robustness**, and this benchmark flags it rather
+than crowning it.
+
+By the same table, **Opus 5** (29.61, position
+gap +0.17) gives the *cleanest* read of a real format
+effect: its verdicts are the least contaminated by position, so its large VENEER
+score is measuring formatting and not seating.
 
 ![by judge](figures/by_judge.png)
 
@@ -87,6 +110,29 @@ Most susceptible: **Opus 5** (29.61).
 - **Position bias is real and separately reported.** Haiku 4.5 picks the first-shown answer 64% of the time, Opus 5 picks the first-shown answer 44% of the time, Sonnet 5 picks the first-shown answer 18% of the time. Randomising presentation
   order per (item, rendering, judge) is therefore load-bearing, not decorative —
   an unrandomised sweep would have measured position, not format.
+
+## Limitations (read these before citing it)
+
+- **The `plain` baseline is arguably a degenerate presentation, not a neutral
+  one.** Claims are generated as atomic, standalone, connective-free sentences,
+  and `plain` joins them with spaces — so the baseline reads as a wall of
+  disconnected assertions. Content that is list-shaped by construction plausibly
+  flatters list renderings. Two things limit the damage: `padded` is prose-vs-
+  prose and immune to it, and the headline swing is anchored between two
+  *variants* rather than against the baseline. Still, "bullets beat prose" is the
+  weakest claim here and a connective-rich prose baseline is the top of the
+  to-do list.
+- **One model family.** All {len(head['judges'])} judges are Anthropic models, so
+  cross-family generalisation is untested. This is the single most valuable
+  contribution an outside user can make.
+- **{head['n_items']} items, 6 domains.** Enough to separate these effect sizes,
+  not enough for fine-grained per-domain claims.
+- **Judges score with one generic rubric.** A rubric that explicitly says
+  "ignore formatting" may well shrink the effect — testing that is the obvious
+  next experiment, and the harness supports it by editing one prompt.
+- **Position bias is large in this judge pool** and is reported per judge for
+  exactly that reason. Any future submission without a position-gap column
+  should be treated as uninterpretable.
 
 ## Reproduce / extend
 

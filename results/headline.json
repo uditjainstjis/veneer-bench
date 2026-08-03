@@ -41,6 +41,9 @@
    "VENEER_score": 8.55,
    "most_moved_by": "padded",
    "its_win_rate": 0.278,
+   "first_pick_rate": 0.134,
+   "position_gap": 0.732,
+   "position_confounded": true,
    "tie_rate": 0.042,
    "control_win_rate": 0.5
   },
@@ -49,6 +52,9 @@
    "VENEER_score": 28.18,
    "most_moved_by": "padded",
    "its_win_rate": 0.0,
+   "first_pick_rate": 0.641,
+   "position_gap": -0.277,
+   "position_confounded": false,
    "tie_rate": 0.014,
    "control_win_rate": NaN
   },
@@ -57,6 +63,9 @@
    "VENEER_score": 29.61,
    "most_moved_by": "emoji",
    "its_win_rate": 0.0,
+   "first_pick_rate": 0.438,
+   "position_gap": 0.174,
+   "position_confounded": false,
    "tie_rate": 0.222,
    "control_win_rate": NaN
   }

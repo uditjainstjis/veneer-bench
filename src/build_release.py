@@ -36,6 +36,8 @@ best_judge = lb.iloc[0]
 worst_judge = lb.iloc[-1]
 struct = summ[summ.axis == "structure"].win_rate.mean() * 100
 emph = summ[summ.axis == "emphasis"].win_rate.mean() * 100
+lbj = {c: summ.loc[summ.rendering == "markdown_max", c].iloc[0]
+       for c in summ.columns if c in ("Haiku 4.5", "Sonnet 5", "Opus 5")}
 
 CARD = f"""# VENEER — a format-bias benchmark for LLM judges
 
@@ -61,14 +63,19 @@ The same claims win **{tw:.1f}%** of the time dressed as `{top}` and only
 The direction is the interesting part, and it is not "more formatting is better":
 
 - **Structure helps.** Bullets, numbered lists, generic headings and tables
-  average **{struct:.1f}%** against plain prose.
-- **Decoration hurts.** Bolded terms, emoji bullets and maximal markdown average
-  **{emph:.1f}%**. Padding the answer with neutral filler — no new facts — is
-  punished hardest.
+  average **{struct:.1f}%** against plain prose. All four clear indifference.
+- **Bulk is punished hardest.** `padded` — the same claims wrapped in neutral
+  hedging, not one new fact — wins just **{bw:.1f}%**.
+- **Decoration is mixed, and that is the sharper finding.** Emoji and maximal
+  markdown lose overall, but `bold_terms` is the one condition whose confidence
+  interval still contains 50% — so "decoration hurts" is not a safe blanket
+  claim.
 
-So an LLM judge is not simply impressed by markdown. It rewards *navigability*
-and penalises *ornament and bulk*. Both are pure presentation, and both move the
-verdict by more than most real quality differences do.
+**The judges disagree in sign.** On `markdown_max`, Haiku 4.5 scores
+{lbj.get('Haiku 4.5', float('nan')):.3f} and Opus 5 scores
+{lbj.get('Opus 5', float('nan')):.3f} — the *same answer* wins or loses depending
+on which judge you asked, on formatting alone. Pooling across judges hides this;
+the per-judge table below does not.
 
 **The control matters most.** Plain prose judged against a byte-identical copy of
 itself ties **{ctie:.0f}%** of the time — the judges correctly see no difference
@@ -84,16 +91,35 @@ conditions differ from indifference at 95% confidence.
 
 **VENEER score** = mean absolute deviation from a 50% win rate across all format
 conditions, in percentage points. It is how much of a verdict presentation alone
-can buy. **0 = perfectly format-blind.** Lower is better.
+can buy. **0 = perfectly format-blind.** Lower is better — but only for a
+judge that is not position-confounded (next paragraph).
 
-| judge | VENEER score ↓ | format that moves it most | its win rate |
-|---|---|---|---|
+**A VENEER score is only interpretable next to the judge's position bias**, so
+the two are always reported together. A judge whose verdict is decided by *where*
+an answer sits produces a win rate pulled toward 50% in every condition — which
+looks identical to genuine format-blindness.
+
+| judge | VENEER score ↓ | moved most by | its win rate | picks 1st-shown | position gap | confounded |
+|---|---|---|---|---|---|---|
 """ + "\n".join(
-    f"| {r.judge} | **{r.VENEER_score}** | `{r.most_moved_by}` | {r.its_win_rate*100:.1f}% |"
+    f"| {r.judge} | **{r.VENEER_score}** | `{r.most_moved_by}` | {r.its_win_rate*100:.1f}% | "
+    f"{r.first_pick_rate*100:.0f}% | {r.position_gap:+.2f} | {'**yes**' if r.position_confounded else 'no'} |"
     for r in lb.itertuples()) + f"""
 
-Most format-robust judge here: **{best_judge.judge}** ({best_judge.VENEER_score}).
-Most susceptible: **{worst_judge.judge}** ({worst_judge.VENEER_score}).
+**Read that table carefully — the lowest score is not the best judge.**
+{best_judge.judge} scores {best_judge.VENEER_score}, but it picks the
+first-shown answer only {best_judge.first_pick_rate*100:.0f}% of the time: its
+variant wins **{(best_judge.position_gap+1)/2*100:.0f}%** of the time when the
+variant is shown second and collapses when shown first (gap
+{best_judge.position_gap:+.2f}). Randomising order correctly cancels that in the
+pooled number, which is exactly why its VENEER score looks flat. **That is
+position dominance, not format robustness**, and this benchmark flags it rather
+than crowning it.
+
+By the same table, **{worst_judge.judge}** ({worst_judge.VENEER_score}, position
+gap {worst_judge.position_gap:+.2f}) gives the *cleanest* read of a real format
+effect: its verdicts are the least contaminated by position, so its large VENEER
+score is measuring formatting and not seating.
 
 ## Files
 
@@ -124,6 +150,29 @@ Most susceptible: **{worst_judge.judge}** ({worst_judge.VENEER_score}).
     for k, v in head["position_bias"].items()) + """. Randomising presentation
   order per (item, rendering, judge) is therefore load-bearing, not decorative —
   an unrandomised sweep would have measured position, not format.
+
+## Limitations (read these before citing it)
+
+- **The `plain` baseline is arguably a degenerate presentation, not a neutral
+  one.** Claims are generated as atomic, standalone, connective-free sentences,
+  and `plain` joins them with spaces — so the baseline reads as a wall of
+  disconnected assertions. Content that is list-shaped by construction plausibly
+  flatters list renderings. Two things limit the damage: `padded` is prose-vs-
+  prose and immune to it, and the headline swing is anchored between two
+  *variants* rather than against the baseline. Still, "bullets beat prose" is the
+  weakest claim here and a connective-rich prose baseline is the top of the
+  to-do list.
+- **One model family.** All {len(head['judges'])} judges are Anthropic models, so
+  cross-family generalisation is untested. This is the single most valuable
+  contribution an outside user can make.
+- **{head['n_items']} items, 6 domains.** Enough to separate these effect sizes,
+  not enough for fine-grained per-domain claims.
+- **Judges score with one generic rubric.** A rubric that explicitly says
+  "ignore formatting" may well shrink the effect — testing that is the obvious
+  next experiment, and the harness supports it by editing one prompt.
+- **Position bias is large in this judge pool** and is reported per judge for
+  exactly that reason. Any future submission without a position-gap column
+  should be treated as uninterpretable.
 
 ## Reproduce / extend
 
