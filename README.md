@@ -1,3 +1,5 @@
+![VENEER](brand/veneer_banner_3x1.png)
+
 # VENEER — a format-bias benchmark for LLM judges
 
 **Same facts. Different clothes. Watch the judge change its mind.**

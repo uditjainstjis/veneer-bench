@@ -24,6 +24,8 @@ configs:
   data_files: leaderboard.csv
 ---
 
+![VENEER](cover.png)
+
 # VENEER — a format-bias benchmark for LLM judges
 
 **Same facts. Different clothes. Watch the judge change its mind.**
