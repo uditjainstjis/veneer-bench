@@ -1,3 +1,29 @@
+---
+license: cc-by-4.0
+language: [en]
+tags:
+- llm-as-a-judge
+- evaluation
+- benchmark
+- bias
+- rlhf
+- format-bias
+pretty_name: "VENEER: LLM Judge Format-Bias Benchmark"
+size_categories:
+- n<1K
+configs:
+- config_name: judgments
+  data_files: judgments.csv
+- config_name: renderings
+  data_files: renderings.csv
+- config_name: items
+  data_files: items.csv
+- config_name: summary
+  data_files: summary.csv
+- config_name: leaderboard
+  data_files: leaderboard.csv
+---
+
 # VENEER — a format-bias benchmark for LLM judges
 
 **Same facts. Different clothes. Watch the judge change its mind.**

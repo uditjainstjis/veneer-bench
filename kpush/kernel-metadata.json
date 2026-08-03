@@ -1,0 +1,15 @@
+{
+ "id": "uditjain13/veneer-is-your-llm-judge-scoring-formatting",
+ "title": "VENEER: Is Your LLM Judge Scoring Formatting?",
+ "code_file": "veneer-is-your-llm-judge-scoring-formatting.ipynb",
+ "language": "python",
+ "kernel_type": "notebook",
+ "is_private": "false",
+ "enable_gpu": "false",
+ "enable_internet": "false",
+ "dataset_sources": [
+  "uditjain13/veneer-llm-judge-format-bias"
+ ],
+ "competition_sources": [],
+ "kernel_sources": []
+}
