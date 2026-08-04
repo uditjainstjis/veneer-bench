@@ -1,0 +1,5 @@
+{
+  "versionNumber": 1,
+  "name": "ladder-probe",
+  "definition": "@kbench.task(name=\"ladder-probe\")\ndef ladder(llm) -> tuple[int, int]:\n    agg = collections.defaultdict(lambda: [0, 0])\n    for p in P:\n        with kbench.chats.new(f\"{p['k']}-{len(agg)}-{agg[p['k']][1]}\"):\n            out = llm.prompt(PROMPT.format(q=p[\"q\"], a=p[\"a\"], b=p[\"b\"]))\n        t = (out or \"\").strip().upper().strip(\" .*`\\n\")\n        ok = t.startswith(p[\"correct\"])\n        agg[p[\"k\"]][1] += 1\n        agg[p[\"k\"]][0] += int(ok)\n    print(\"\\n===== LADDER RESULT =====\")\n    tot_g = tot_n = 0\n    for k in sorted(agg):\n        g, n = agg[k]\n        tot_g += g; tot_n += n\n        print(f\"gap={k} claim(s) removed -> pretty-but-worse REJECTED {g}/{n} = {g/n:.0%}\")\n    return tot_g, tot_n\n"
+}

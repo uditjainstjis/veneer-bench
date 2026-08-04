@@ -21386,3 +21386,6 @@ half. Transcripts are the expensive half and are disposable; this is not.
   > 
   > Reply with exactly one token and nothing else: A, B, or TIE.
 
+- [2026-08-04 05:57]
+  > how we get organic traction and virality of this one, improve our benchmark, add more tasks and models controlling ui
+

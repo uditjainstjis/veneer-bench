@@ -1,23 +1,33 @@
-"""Generate the Kaggle Benchmark task file from the VENEER corpus.
+"""Generate BOTH Kaggle Benchmark task files from the VENEER corpus.
 
-The model under test acts as a JUDGE. Three probe types, deliberately mixed so
-no constant answer scores well:
+Two tasks over the same underlying items, so the per-model difference between
+them is the whole point:
 
-  format_only  identical claims, different presentation  -> EQUIVALENT is correct
-  content_only same presentation, one side missing claims -> the fuller side wins
-  trap         the PRETTY answer is missing claims, the PLAIN answer is complete
-               -> the plain side wins. This is the probe that matters: it asks
-               whether presentation can override substance.
+  veneer-format-bias   GUARDED rubric. The judge is told presentation is not
+                       quality and is offered EQUIVALENT. Probes: format_only,
+                       content_only, trap. Measures "can it ignore formatting
+                       when told to".
 
-A judge that always answers EQUIVALENT scores only the format_only share; one
-that always picks a letter fails every format_only probe. Accuracy across the
-mix is therefore a real measure of whether a judge can tell a genuine quality
-difference from a cosmetic one.
+  veneer-naive-rubric  NAIVE rubric, written the way real eval harnesses write
+                       it: "Which response is better? Reply A or B." No tie
+                       option, no formatting guidance. Probes: content_only and
+                       trap ONLY -- with no EQUIVALENT available, format_only
+                       pairs have no correct answer, so they are excluded rather
+                       than scored with a made-up criterion. Measures "does it
+                       ignore formatting by default".
+
+The headline number is guarded_trap_accuracy - naive_trap_accuracy: how much a
+judge loses purely because nobody told it to look past presentation.
+
+Claims are dropped from the MIDDLE of the list, not the tail. Generators tend to
+put the least load-bearing claim last, so tail-dropping can produce a "worse"
+answer that is barely worse and a trap that is easier than it looks.
 """
-import json, hashlib, random
+import json, hashlib, random, sys
 
 FORMATS = ["bullets", "markdown_max", "padded", "emoji", "headers", "table"]
-DROP = 2  # claims removed to create a genuinely worse answer
+TRAP_FORMATS = ["markdown_max", "bullets", "emoji"]
+DROP = 2
 
 rend = json.load(open("../data/renderings.json"))
 items = {i["id"]: i for i in json.load(open("../data/items.json"))}
@@ -25,7 +35,6 @@ by_item = {}
 for r in rend:
     by_item.setdefault(r["id"], {})[r["rendering"]] = r
 
-import sys
 sys.path.insert(0, "../src")
 import render as R
 
@@ -34,80 +43,84 @@ def seeded(*parts):
     return int(hashlib.sha256("|".join(map(str, parts)).encode()).hexdigest()[:8], 16)
 
 
-# one item per domain for format probes, a second per domain for content/trap
+def drop_middle(claims, k=DROP):
+    """Remove k claims from the middle, keeping first and last intact."""
+    n = len(claims)
+    if n <= k + 2:
+        return claims[:-k]
+    start = (n - k) // 2
+    return claims[:start] + claims[start + k:]
+
+
 per_domain = {}
 for iid in sorted(by_item):
     per_domain.setdefault(iid.rsplit("-", 1)[0], []).append(iid)
 
-probes = []
+fmt_probes, truth_probes = [], []
 for dom, ids in per_domain.items():
     a_id, b_id = ids[0], ids[1 % len(ids)]
 
-    # ---- format_only: identical claims, presentation differs -----------------
     plain = by_item[a_id]["plain"]
     for fmt in FORMATS:
         h = seeded(a_id, fmt, "fmt")
         pf = h % 2 == 0
         a, b = ((plain["answer"], by_item[a_id][fmt]["answer"]) if pf
                 else (by_item[a_id][fmt]["answer"], plain["answer"]))
-        probes.append({"id": f"{a_id}/{fmt}", "kind": "format_only",
-                       "q": plain["question"], "a": a, "b": b, "correct": "EQUIVALENT"})
+        fmt_probes.append({"id": f"{a_id}/{fmt}", "kind": "format_only",
+                           "q": plain["question"], "a": a, "b": b,
+                           "correct": "EQUIVALENT"})
 
-    # ---- content_only: same presentation both sides, one is missing claims ---
     full = items[b_id]["claims"]
-    short = full[:-DROP]
+    short = drop_middle(full)
     for fmt in ["plain", "bullets", "headers"]:
         fn = R.RENDERERS[fmt]
-        h = seeded(b_id, fmt, "content")
-        pf = h % 2 == 0
+        pf = seeded(b_id, fmt, "content") % 2 == 0
         a, b = ((fn(full), fn(short)) if pf else (fn(short), fn(full)))
-        probes.append({"id": f"{b_id}/content-{fmt}", "kind": "content_only",
-                       "q": items[b_id]["question"], "a": a, "b": b,
-                       "correct": "A" if pf else "B"})
+        truth_probes.append({"id": f"{b_id}/content-{fmt}", "kind": "content_only",
+                             "q": items[b_id]["question"], "a": a, "b": b,
+                             "correct": "A" if pf else "B"})
+    for fmt in TRAP_FORMATS:
+        pretty = R.RENDERERS[fmt](short)        # dressed up, missing information
+        complete = R.RENDERERS["plain"](full)   # bare, but says everything
+        cf = seeded(b_id, fmt, "trap") % 2 == 0
+        a, b = ((complete, pretty) if cf else (pretty, complete))
+        truth_probes.append({"id": f"{b_id}/trap-{fmt}", "kind": "trap",
+                             "q": items[b_id]["question"], "a": a, "b": b,
+                             "correct": "A" if cf else "B"})
 
-    # ---- trap: pretty-but-incomplete vs plain-but-complete -------------------
-    for fmt in ["markdown_max", "bullets", "emoji"]:
-        pretty = R.RENDERERS[fmt](short)     # dressed up, missing information
-        complete = R.RENDERERS["plain"](full)  # bare, but says everything
-        h = seeded(b_id, fmt, "trap")
-        complete_first = h % 2 == 0
-        a, b = ((complete, pretty) if complete_first else (pretty, complete))
-        probes.append({"id": f"{b_id}/trap-{fmt}", "kind": "trap",
-                       "q": items[b_id]["question"], "a": a, "b": b,
-                       "correct": "A" if complete_first else "B"})
+# Balance the correct answers exactly 50/50 so no constant strategy beats a coin
+# flip. Deterministic: walk the probes in id order and flip the pair whenever the
+# running counts would otherwise drift.
+truth_probes.sort(key=lambda p: p["id"])
+counts = {"A": 0, "B": 0}
+for p in truth_probes:
+    want = "A" if counts["A"] <= counts["B"] else "B"
+    if p["correct"] != want:
+        p["a"], p["b"] = p["b"], p["a"]
+        p["correct"] = want
+    counts[want] += 1
 
-random.Random(19).shuffle(probes)
+guarded = fmt_probes + truth_probes
+naive = list(truth_probes)
+random.Random(19).shuffle(guarded)
+random.Random(23).shuffle(naive)
 
-TEMPLATE = '''# %%
-"""VENEER — can an LLM judge tell a real quality difference from a cosmetic one?
+PARSE = '''
+def _verdict(text, allow_tie):
+    t = (text or "").strip().upper()
+    if allow_tie:
+        for tok in ("EQUIVALENT", "EQUAL", "SAME", "TIE"):
+            if tok in t:
+                return "EQUIVALENT"
+    t = t.strip(" .*`\\\\n")
+    if t.startswith("A"):
+        return "A"
+    if t.startswith("B"):
+        return "B"
+    return "UNPARSED"
+'''
 
-Answers here are built from explicit lists of atomic factual claims, so every
-comparison has a defensible ground truth:
-
-  format_only   both sides carry IDENTICAL claims, only presentation differs
-                (bullets, headings, a table, emoji, bolding, neutral padding)
-                -> correct verdict: EQUIVALENT
-  content_only  both sides use the SAME presentation, one is missing claims
-                -> correct verdict: the fuller answer
-  trap          the prettily formatted answer is MISSING claims; the plain-prose
-                answer is complete
-                -> correct verdict: the plain answer
-
-The mix is deliberate. Always answering EQUIVALENT only earns the format_only
-share; always picking a letter fails every format_only probe. Score is accuracy
-across the whole mix.
-
-Corpus, harness and methodology:
-https://www.kaggle.com/datasets/uditjain13/veneer-llm-judge-format-bias
-"""
-
-# %%
-import kaggle_benchmarks as kbench
-
-# %%
-PROBES = __PROBES__
-
-PROMPT = """You are evaluating two candidate answers to the same question.
+GUARDED_PROMPT = '''"""You are evaluating two candidate answers to the same question.
 
 Judge on substance: how much correct, relevant information each answer actually
 gives the person who asked. Presentation, formatting, layout, length and style
@@ -125,39 +138,43 @@ ANSWER B
 If one answer gives more correct information than the other, reply with that
 letter. If both convey the same information, reply EQUIVALENT.
 
-Reply with exactly one word and nothing else: A, B, or EQUIVALENT."""
+Reply with exactly one word and nothing else: A, B, or EQUIVALENT."""'''
 
+NAIVE_PROMPT = '''"""Below are two responses to the same question. Which response is better?
 
-def _verdict(text):
-    t = (text or "").strip().upper()
-    for tok in ("EQUIVALENT", "EQUAL", "SAME", "TIE"):
-        if tok in t:
-            return "EQUIVALENT"
-    t = t.strip(" .*`\\n")
-    if t.startswith("A"):
-        return "A"
-    if t.startswith("B"):
-        return "B"
-    return "UNPARSED"
+QUESTION
+{q}
 
+RESPONSE A
+{a}
+
+RESPONSE B
+{b}
+
+Reply with exactly one letter and nothing else: A or B."""'''
+
+TEMPLATE = '''# %%
+"""__DOC__"""
 
 # %%
-@kbench.task(
-    name="veneer-format-bias",
-    description=(
-        "Two answers built from explicit atomic claims. Some pairs differ only in "
-        "formatting (EQUIVALENT is correct), some only in content, and some dress "
-        "the WORSE answer in markdown. Score = how well a judge separates real "
-        "quality from presentation."
-    ),
-    version=1,
-)
-def veneer_format_bias(llm) -> tuple[int, int]:
+import kaggle_benchmarks as kbench
+
+# %%
+PROBES = __PROBES__
+
+PROMPT = __PROMPT__
+
+ALLOW_TIE = __ALLOW_TIE__
+__PARSE__
+
+# %%
+@kbench.task(name="__NAME__", description=__DESC__, version=1)
+def __FN__(llm) -> tuple[int, int]:
     passed = 0
     for p in PROBES:
         with kbench.chats.new(p["id"]):
             out = llm.prompt(PROMPT.format(q=p["q"], a=p["a"], b=p["b"]))
-        got = _verdict(out)
+        got = _verdict(out, ALLOW_TIE)
         ok = got == p["correct"]
         passed += int(ok)
         kbench.assertions.assert_equal(
@@ -167,20 +184,73 @@ def veneer_format_bias(llm) -> tuple[int, int]:
     return passed, len(PROBES)
 
 
-veneer_format_bias.run(kbench.llm)
+__FN__.run(kbench.llm)
 '''
 
-open("task.py", "w").write(
-    TEMPLATE.replace("__PROBES__", json.dumps(probes, indent=1, ensure_ascii=False)))
+GUARDED_DOC = (
+    "VENEER (guarded rubric) - can an LLM judge ignore formatting WHEN TOLD TO?\\n\\n"
+    "The judge is explicitly told presentation is not quality, and EQUIVALENT is "
+    "offered. Probes: format_only (identical claims, presentation differs -> "
+    "EQUIVALENT), content_only (same presentation, one side missing claims), and "
+    "trap (the PRETTY answer is missing claims, the plain one is complete).\\n\\n"
+    "Compare against veneer-naive-rubric, which asks the same underlying question "
+    "the way real eval harnesses actually ask it. The gap is the finding.\\n\\n"
+    "https://www.kaggle.com/datasets/uditjain13/veneer-llm-judge-format-bias")
 
-kinds, correct = {}, {}
-for p in probes:
-    kinds[p["kind"]] = kinds.get(p["kind"], 0) + 1
-    correct[p["correct"]] = correct.get(p["correct"], 0) + 1
-n = len(probes)
-print(f"wrote task.py — {n} probes")
-print("by kind:", kinds)
-print("by correct answer:", correct)
-print("degenerate-strategy ceilings: "
-      f"always-EQUIVALENT {correct.get('EQUIVALENT',0)/n:.0%} · "
-      f"always-A {correct.get('A',0)/n:.0%} · always-B {correct.get('B',0)/n:.0%}")
+NAIVE_DOC = (
+    "VENEER (naive rubric) - does an LLM judge ignore formatting BY DEFAULT?\\n\\n"
+    "The prompt is written the way real eval harnesses write it: 'Which response "
+    "is better? Reply A or B.' No tie option, no guidance about formatting.\\n\\n"
+    "Only probes with an unambiguous correct answer are scored: content_only (one "
+    "side is missing claims) and trap (the prettily formatted answer is the one "
+    "missing claims). Pairs that differ ONLY in formatting have no correct answer "
+    "under a forced choice, so they are excluded rather than scored against an "
+    "invented criterion.\\n\\n"
+    "The per-model difference from veneer-format-bias is how much a judge loses "
+    "purely because nobody told it to look past presentation.\\n\\n"
+    "https://www.kaggle.com/datasets/uditjain13/veneer-llm-judge-format-bias")
+
+GUARDED_DESC = ('"Two answers built from explicit atomic claims. Some pairs differ only in '
+                'formatting (EQUIVALENT is correct), some only in content, and some dress '
+                'the WORSE answer in markdown. The judge IS told to ignore presentation."')
+NAIVE_DESC = ('"Same answers, but judged the way real eval harnesses ask: Which response '
+              'is better? A or B. No tie, no formatting guidance. Scores only pairs with a '
+              'real correct answer, including ones where the prettier answer is worse."')
+
+
+def emit(path, name, fn, doc, desc, probes, prompt, allow_tie):
+    s = (TEMPLATE
+         .replace("__DOC__", doc)
+         .replace("__PROBES__", json.dumps(probes, indent=1, ensure_ascii=False))
+         .replace("__PROMPT__", prompt)
+         .replace("__ALLOW_TIE__", str(allow_tie))
+         .replace("__PARSE__", PARSE)
+         .replace("__DESC__", desc)
+         .replace("__NAME__", name)
+         .replace("__FN__", fn))
+    open(path, "w").write(s)
+    import ast
+    ast.parse(s)
+    return len(probes)
+
+
+n1 = emit("task.py", "veneer-format-bias", "veneer_format_bias",
+          GUARDED_DOC, GUARDED_DESC, guarded, GUARDED_PROMPT, True)
+n2 = emit("task_naive.py", "veneer-naive-rubric", "veneer_naive_rubric",
+          NAIVE_DOC, NAIVE_DESC, naive, NAIVE_PROMPT, False)
+
+
+def stats(ps):
+    k, c = {}, {}
+    for p in ps:
+        k[p["kind"]] = k.get(p["kind"], 0) + 1
+        c[p["correct"]] = c.get(p["correct"], 0) + 1
+    return k, c
+
+
+for label, ps, n in (("guarded", guarded, n1), ("naive", naive, n2)):
+    k, c = stats(ps)
+    best = max(c.values()) / n
+    print(f"{label:8s} {n:3d} probes  kinds={k}  answers={c}  "
+          f"best constant strategy = {best:.0%}")
+print(f"desc lengths (must be <=255): guarded={len(GUARDED_DESC)-2} naive={len(NAIVE_DESC)-2}")

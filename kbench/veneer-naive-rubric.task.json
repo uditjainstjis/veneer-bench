@@ -1,0 +1,6 @@
+{
+  "versionNumber": 1,
+  "name": "veneer-naive-rubric",
+  "description": "Same answers, but judged the way real eval harnesses ask: Which response is better? A or B. No tie, no formatting guidance. Scores only pairs with a real correct answer, including ones where the prettier answer is worse.",
+  "definition": "@kbench.task(name=\"veneer-naive-rubric\", description=\"Same answers, but judged the way real eval harnesses ask: Which response is better? A or B. No tie, no formatting guidance. Scores only pairs with a real correct answer, including ones where the prettier answer is worse.\", version=1)\ndef veneer_naive_rubric(llm) -> tuple[int, int]:\n    passed = 0\n    for p in PROBES:\n        with kbench.chats.new(p[\"id\"]):\n            out = llm.prompt(PROMPT.format(q=p[\"q\"], a=p[\"a\"], b=p[\"b\"]))\n        got = _verdict(out, ALLOW_TIE)\n        ok = got == p[\"correct\"]\n        passed += int(ok)\n        kbench.assertions.assert_equal(\n            p[\"correct\"], got,\n            expectation=f\"[{p['kind']}] correct verdict is {p['correct']}\",\n        )\n    return passed, len(PROBES)\n"
+}
