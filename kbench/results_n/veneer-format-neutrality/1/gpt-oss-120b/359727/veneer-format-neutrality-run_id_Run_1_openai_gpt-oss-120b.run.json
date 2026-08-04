@@ -1,0 +1,34 @@
+{
+  "taskVersion": {
+    "versionNumber": 1,
+    "name": "veneer-format-neutrality",
+    "description": "Identical claims rendered two ways, every pair shown in both orders, forced A/B. Scores how far a judge's preference tilts on presentation alone: 100 = format-neutral, 0 = fully format-driven. Averaged per format so opposite biases cannot cancel out.",
+    "definition": "@kbench.task(name=\"veneer-format-neutrality\", description=\"Identical claims rendered two ways, every pair shown in both orders, forced A/B. Scores how far a judge's preference tilts on presentation alone: 100 = format-neutral, 0 = fully format-driven. Averaged per format so opposite biases cannot cancel out.\", version=1)\ndef veneer_format_neutrality(llm) -> float:\n    picked = {}\n    for p in PROBES:\n        with kbench.chats.new(f\"{p['pair']}#{p['order']}\"):\n            out = llm.prompt(PROMPT.format(q=p[\"q\"], a=p[\"a\"], b=p[\"b\"]))\n        L = _letter(out)\n        if L is None:\n            continue\n        picked.setdefault(p[\"pair\"], {})[p[\"order\"]] = {\n            \"chose_formatted\": L == p[\"formatted_is\"], \"letter\": L, \"fmt\": p[\"fmt\"]}\n\n    per_fmt = collections.defaultdict(lambda: {\"f\": 0, \"p\": 0, \"n\": 0})\n    same_position = total_pairs = 0\n    for pair, seen in picked.items():\n        if len(seen) < 2:\n            continue\n        o0, o1 = seen[0], seen[1]\n        fmt = o0[\"fmt\"]\n        per_fmt[fmt][\"n\"] += 1\n        total_pairs += 1\n        if o0[\"chose_formatted\"] and o1[\"chose_formatted\"]:\n            per_fmt[fmt][\"f\"] += 1\n        elif not o0[\"chose_formatted\"] and not o1[\"chose_formatted\"]:\n            per_fmt[fmt][\"p\"] += 1\n        if o0[\"letter\"] == o1[\"letter\"]:\n            same_position += 1\n\n    tilts = []\n    print(\"\\n===== VENEER format neutrality =====\")\n    for fmt in sorted(per_fmt):\n        d = per_fmt[fmt]\n        tilt = abs(d[\"f\"] - d[\"p\"]) / d[\"n\"]\n        tilts.append(tilt)\n        lean = \"formatted\" if d[\"f\"] > d[\"p\"] else (\"plain\" if d[\"p\"] > d[\"f\"] else \"none\")\n        print(f\"  {fmt:14s} formatted x2={d['f']:2d}  plain x2={d['p']:2d}  \"\n              f\"n={d['n']:2d}  tilt={tilt:.2f} toward {lean}\")\n        kbench.assertions.assert_true(\n            tilt <= 0.5,\n            expectation=f\"[{fmt}] presentation tilts the verdict by <=50% of pairs\",\n        )\n\n    format_index = sum(tilts) / len(tilts) if tilts else 0.0\n    score = round(100.0 * (1.0 - format_index), 2)\n    pos_rate = same_position / total_pairs if total_pairs else 0.0\n    print(f\"  format_index = {format_index:.3f}   ->   NEUTRALITY SCORE = {score}\")\n    print(f\"  position rate (same letter both orders) = {pos_rate:.2f} \"\n          f\"[diagnostic, not scored]\")\n    return score\n"
+  },
+  "modelVersion": {
+    "slug": "openai/gpt-oss-120b"
+  },
+  "state": "BENCHMARK_TASK_RUN_STATE_ERRORED",
+  "startTime": "2026-08-04T00:56:00.373746Z",
+  "endTime": "2026-08-04T00:56:02.827788Z",
+  "conversations": [
+    {
+      "id": "veneer-format-neutrality-932660b7",
+      "metrics": {},
+      "modelVersionSlug": "model_version_slug for conversation is DEPRECATED"
+    },
+    {
+      "id": "science-00/bullets#1-a205d6dd",
+      "metrics": {},
+      "modelVersionSlug": "model_version_slug for conversation is DEPRECATED"
+    }
+  ],
+  "results": [
+    {
+      "type": "AGGREGATED",
+      "booleanResult": false
+    }
+  ],
+  "pyRunId": "veneer-format-neutrality-Run #1",
+  "errorMessage": "Traceback (most recent call last):\n  File \"/benchmarks/src/kaggle_benchmarks/tasks.py\", line 171, in run\n    run.result = self.func(*args, **kwargs)\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/ipykernel_12/3681138573.py\", line 6, in veneer_format_neutrality\n    out = llm.prompt(PROMPT.format(q=p[\"q\"], a=p[\"a\"], b=p[\"b\"]))\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/benchmarks/src/kaggle_benchmarks/actors/llms.py\", line 264, in prompt\n    response = self.respond(schema=schema, **kwargs, **extra)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/benchmarks/src/kaggle_benchmarks/chats.py\", line 124, in wrapper\n    result = func(self, *args, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/benchmarks/src/kaggle_benchmarks/actors/llms.py\", line 331, in respond\n    invoke_response = self.invoke(\n                      ^^^^^^^^^^^^\n  File \"/benchmarks/src/kaggle_benchmarks/actors/llms.py\", line 474, in invoke\n    return self._call_api(raw_messages, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/benchmarks/src/kaggle_benchmarks/actors/llms.py\", line 525, in _call_api\n    response = method(\n               ^^^^^^^\n  File \"/benchmarks/.venv/lib/python3.11/site-packages/openai/_utils/_utils.py\", line 286, in wrapper\n    return func(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"/benchmarks/.venv/lib/python3.11/site-packages/openai/resources/chat/completions/completions.py\", line 1192, in create\n    return self._post(\n           ^^^^^^^^^^^\n  File \"/benchmarks/.venv/lib/python3.11/site-packages/openai/_base_client.py\", line 1259, in post\n    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))\n                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/benchmarks/.venv/lib/python3.11/site-packages/openai/_base_client.py\", line 1047, in request\n    raise self._make_status_error_from_response(err.response) from None\nopenai.RateLimitError: Error code: 429 - {'code': '', 'message': 'The model is currently experiencing heavy load. Try again later.', 'param': '', 'type': 'rate_limit_error'}\n"
+}
