@@ -3,3 +3,7 @@ __pycache__/
 data/gen.log
 results/judge.log
 .DS_Store
+kbench/.env
+kbench/results/
+kbench/*.run.json
+kbench/example_task.py
